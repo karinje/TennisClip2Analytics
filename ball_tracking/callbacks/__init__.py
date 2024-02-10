@@ -1,1 +1,1 @@
-from .short_epoch_fixed import ShortEpochCallbackFixed
+from .short_epoch_fixed import ShortEpochCallbackFixed, ShortEpochBothCallback 
