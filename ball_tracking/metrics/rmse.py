@@ -1,9 +1,9 @@
-IMG_RESIZE = (360,640)
 from fastai.metrics import Metric
 from ball_tracking.data.ball_gaussian import BallGaussianDataModule
 from ball_tracking.data.data_module import BaseDataModule
 from ball_tracking.models.tracknet import TrackNet
 from ball_tracking.learner.learner import CreateLearner
+from ball_tracking.metrics.utils import mask2coord
 import argparse
 import logging
 import torch
@@ -17,13 +17,8 @@ class RMSEArgmax(Metric):
     def r2_dist(self, a, b):
       return torch.sqrt(torch.pow(a-b,2).mean(axis=-1))
 
-    def mask2coord(self, batch, img_size=IMG_RESIZE):
-      bs = len(batch)
-      w = img_size[1]
-      return torch.stack([torch.stack([x+1,y+1]) for x,y in zip(batch.view(bs,-1).argmax(dim=-1)%w, batch.view(bs,-1).argmax(dim=-1)//w)]).float()
-
     def accumulate(self, learn):
-      preds,y = self.mask2coord(learn.pred), self.mask2coord(learn.y)
+      preds,y = mask2coord(learn.pred), mask2coord(learn.y)
       self.r2_dist_acc += self.r2_dist(preds, y).sum()
       self.r2_count += len(preds)
 
@@ -51,7 +46,7 @@ if __name__=="__main__":
     b = learner.dls.valid.one_batch()
     rmse = RMSEArgmax()
     gt = torch.tensor(list(map(base_d.get_y(),(learner.dls.valid.items[0],learner.dls.valid.items[1]))))
-    pred = rmse.mask2coord(b[3]).cpu()*2
+    pred = mask2coord(b[3]).cpu()*2
     logging.info(f'gt: {gt}, pred: {pred}')
     logging.info(f'rmse: {rmse.r2_dist(gt,pred)}')
     # python ~/git/ball_tracking_3d/ball_tracking/data/data_module.py --train_data_path /Users/sanjaykarinje/Downloads/Dataset 

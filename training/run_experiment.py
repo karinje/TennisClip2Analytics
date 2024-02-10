@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 import torch
 from ball_tracking.learner import CreateLearner
-from ball_tracking.callbacks import ShortEpochCallbackFixed
+from ball_tracking.callbacks import ShortEpochCallbackFixed, ShortEpochBothCallback 
+from ball_tracking.metrics import RMSEArgmax, PredStats 
 from training.util import DATA_CLASS_MODULE, MODEL_CLASS_MODULE, import_class, setup_data_and_model_from_args
 from torch.profiler import profile, record_function, ProfilerActivity
 import logging
@@ -26,6 +27,12 @@ def _setup_parser():
     parser.set_defaults(max_epochs=1)
 
     # Basic arguments
+    parser.add_argument(
+        "--max_epochs",
+        type=int,
+        default=1,
+        help="Specify number of epochs"
+    )
     parser.add_argument(
         "--gpus",
         type=int,
@@ -127,7 +134,8 @@ def main():
     data, model = setup_data_and_model_from_args(args)
     logging.info(f'data class: {data} and model class: {model}')
     #logging.info(data.print_info())
-    learner = CreateLearner(model, data.get_dls(), args).get_learner()
+    rmse, pred_stats = RMSEArgmax(), PredStats() 
+    learner = CreateLearner(model, data.get_dls(), [rmse, pred_stats], args).get_learner()
     logging.info(f'bs set in learner: {learner.dls.train.bs}')
     if args.load_learner is not None:
         learner = learner.load(args.load_checkpoint)
@@ -136,10 +144,10 @@ def main():
     log_dir.mkdir(exist_ok=True, parents=True)
 
     if args.short_epoch < 1:
-        learner.add_cb(ShortEpochCallbackFixed(pct=args.short_epoch, short_valid=False))
+        learner.add_cb(ShortEpochBothCallback(pct=args.short_epoch, short_valid=False))
 
     if args.save_model:
-        learner.add_cb(SaveModelCallback(every_epoch=True, at_end=False, with_opt=True, reset_on_fit=True))
+        learner.add_cb(SaveModelCallback(every_epoch=False, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
 
     if args.wandb:
         learner.add_cb(WandbCallback(log_preds=False))
@@ -156,15 +164,15 @@ def main():
         #lrf = learner.lr_find()
 
     #lr = lrf.valley
-    lr = 1e-3
+    lr = 1e-2
     b = learner.dls.train.one_batch()
     logging.info(f'lr found through lr_find: {lr}')
     logging.info(f'batch len: {len(b)}, shape: {b[0].shape}')
     logging.info(f'callbacks added: {learner.cbs}')
     #logging.info(f'smooth loss: {learner.smooth_loss}')
     #logging.info(learner.summary())
-    learner.lr_find()
-    #learner.fit(args.max_epochs, lr)
+    #learner.lr_find()
+    learner.fit(args.max_epochs, lr)
 
 if __name__ == "__main__":
     main()

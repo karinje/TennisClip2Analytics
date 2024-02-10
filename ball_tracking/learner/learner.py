@@ -19,10 +19,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 class CreateLearner(object):
     """class to setup learner object from provided arguments"""
-    def __init__(self, model: nn.Module, dls: DataLoaders, args: argparse.Namespace=None) -> None:
+    def __init__(self, model: nn.Module, dls: DataLoaders, metrics: list, args: argparse.Namespace=None) -> None:
         super().__init__()
         self.model = model
         self.dls = dls
+        self.metrics = metrics
         self.args = vars(args) if args is not None else {}
         self.data_config = self.model.data_config
         self.input_dims = self.data_config["num_inp_images"]
@@ -35,7 +36,7 @@ class CreateLearner(object):
         self.one_cycle_total_steps = self.args.get("one_cycle_total_steps", ONE_CYCLE_TOTAL_STEPS)
 
     def get_learner(self):
-        return Learner(self.dls, self.model, opt_func=self.opt_func, loss_func=self.loss_fn)
+        return Learner(self.dls, self.model, opt_func=self.opt_func, metrics=self.metrics, loss_func=self.loss_fn)
 
     @staticmethod
     def add_to_argparse(parser):

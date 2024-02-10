@@ -47,7 +47,7 @@ class BallGaussianDataModule(BaseDataModule):
             x,y = list(map(int, s_get_y(f)))
             size, variance = self.kernel_size, self.variance
             x,y = min(x, WIDTH-1), min(y, HEIGHT-1)
-            logging.info(f'x: {x}, y: {y}, size: {size}, variance: {variance}')
+            logging.debug(f'x: {x}, y: {y}, size: {size}, variance: {variance}')
             if self.kernel=='gaussian': kernel_func = gaussian_kernel
             out_arr = np.zeros((HEIGHT+2*size, WIDTH+2*size))
             logging.debug(f'Ball Coords: {(x,y)},Types: {type(x), type(y)}, Output Arr Shape: {out_arr.shape}, X Slice: {slice(x, x+2*size+1)}, Y Slice: {slice(y, y+2*size+1)}')
