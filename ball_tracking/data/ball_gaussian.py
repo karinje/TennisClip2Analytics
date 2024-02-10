@@ -44,15 +44,15 @@ class BallGaussianDataModule(BaseDataModule):
     def get_y(self, label_file='Label.csv'):
         s_get_y = super().get_y(label_file=label_file)
         def _get_y(f):
-            y,x = list(map(int, s_get_y(f)))
+            x,y = list(map(int, s_get_y(f)))
             size, variance = self.kernel_size, self.variance
             x,y = min(x, WIDTH-1), min(y, HEIGHT-1)
-            logging.debug(f'x: {x}, y: {y}, size: {size}, variance: {variance}')
+            logging.info(f'x: {x}, y: {y}, size: {size}, variance: {variance}')
             if self.kernel=='gaussian': kernel_func = gaussian_kernel
             out_arr = np.zeros((HEIGHT+2*size, WIDTH+2*size))
             logging.debug(f'Ball Coords: {(x,y)},Types: {type(x), type(y)}, Output Arr Shape: {out_arr.shape}, X Slice: {slice(x, x+2*size+1)}, Y Slice: {slice(y, y+2*size+1)}')
-            logging.debug(f'out arr sliced shape: {out_arr[slice(x, x+2*size+1), slice(y, y+2*size+1)].shape}, gaussian kernal shape: {kernel_func(size, variance).shape}')
-            out_arr[slice(x, x+2*size+1), slice(y, y+2*size+1)] = kernel_func(size, variance)*(self.output_classes-1)
+            logging.debug(f'out arr sliced shape: {out_arr[slice(y, y+2*size+1), slice(x, x+2*size+1)].shape}, gaussian kernal shape: {kernel_func(size, variance).shape}')
+            out_arr[slice(y, y+2*size+1), slice(x, x+2*size+1)] = kernel_func(size, variance)*(self.output_classes-1)
             return tensor(out_arr[size:-size, size:-size]).short()
         return _get_y
 
