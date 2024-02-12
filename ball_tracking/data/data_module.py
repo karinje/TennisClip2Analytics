@@ -123,11 +123,13 @@ class BaseDataModule(object):
         return {"num_inp_images":self.num_inp_images, "output_classes": self.output_classes}
 
     def print_info(self):
-        logging.info(f'Input images per sample: {self.num_inp_images} and target img in pos: {self.target_pos}')
-        logging.info(f'# train imgs: {len(self.get_valid_files()(self.train_data_path))}, source path: {self.train_data_path}')
-        logging.info(f'# infer imgs: {len(self.get_valid_files()(self.infer_data_path))}, source path: {self.infer_data_path}')
+        logging.info("Data Module Details-----------------------------------------------------------------------------------")
+        logging.info(f'Class: {type(self).__name__}')
+        logging.info(f'Input Images per Sample: {self.num_inp_images} and Target Img Position: {self.target_pos}')
+        logging.info(f'# Train Imgs: {len(self.get_valid_files()(self.train_data_path))}, Source Path: {self.train_data_path}')
+        logging.info(f'# Infer Imgs: {len(self.get_valid_files()(self.infer_data_path))}, Source Path: {self.infer_data_path}')
         sample_f = self.get_valid_files()(self.train_data_path)[0]
-        logging.info(f'sample file: {sample_f}')
+        logging.info(f'Sample File: {sample_f}')
         logging.info(f'check get_xs: {[func(sample_f) for func in self.get_xs()]}')
         logging.info(f'check get_y: {self.get_y()(sample_f)}')
 

@@ -24,8 +24,6 @@ def _setup_parser():
     learner_parser = CreateLearner.add_to_argparse(parser)
     learner_parser._action_groups[1].title = "Learner Args"
     parser = argparse.ArgumentParser(add_help=False, parents=[learner_parser])
-    parser.set_defaults(max_epochs=1)
-
     # Basic arguments
     parser.add_argument(
         "--max_epochs",
@@ -98,6 +96,9 @@ def _setup_parser():
     data_group = parser.add_argument_group("Data Args")
     data_class.add_to_argparser(data_group)
 
+    model_group = parser.add_argument_group("Model Args")
+    model_class.add_to_argparser(model_group)
+
     parser.add_argument("--help", "-h", action="help")
     return parser
 
@@ -132,47 +133,44 @@ def main():
     args = parser.parse_args()
     #default_device(False)
     data, model = setup_data_and_model_from_args(args)
-    logging.info(f'data class: {data} and model class: {model}')
-    #logging.info(data.print_info())
     rmse, pred_stats = RMSEArgmax(), PredStats() 
-    learner = CreateLearner(model, data.get_dls(), [rmse, pred_stats], args).get_learner()
-    logging.info(f'bs set in learner: {learner.dls.train.bs}')
+    setup_learner = CreateLearner(model, data.get_dls(), [rmse, pred_stats], args)
+    data.print_info()
+    model.print_info()
+    setup_learner.print_info()
+    learn = setup_learner.get_learner()
+
     if args.load_learner is not None:
-        learner = learner.load(args.load_checkpoint)
+        learn = learn.load(args.load_checkpoint)
 
     log_dir = Path("training") / "logs"
     log_dir.mkdir(exist_ok=True, parents=True)
 
     if args.short_epoch < 1:
-        learner.add_cb(ShortEpochBothCallback(pct=args.short_epoch, short_valid=False))
+        learn.add_cb(ShortEpochBothCallback(pct=args.short_epoch, short_valid=False))
 
     if args.save_model:
-        learner.add_cb(SaveModelCallback(every_epoch=False, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
+        learn.add_cb(SaveModelCallback(every_epoch=False, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
 
     if args.wandb:
-        learner.add_cb(WandbCallback(log_preds=False))
+        learn.add_cb(WandbCallback(log_preds=False))
     else:
-        learner.add_cb(TensorBoardCallback(log_dir=log_dir, trace_model=False, log_preds=False))
+        learn.add_cb(TensorBoardCallback(log_dir=log_dir, trace_model=False, log_preds=False))
 
-    logging.info(f'Device: {default_device()}')
     if args.profile:
         with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],with_stack=True) as prof:
-            #lrf = learner.lr_find() 
+            lrf = learner.lr_find() 
             print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cuda_time_total", row_limit=2))
     else:
-        pass
-        #lrf = learner.lr_find()
+        lrf = learn.lr_find()
 
-    #lr = lrf.valley
+    lr = lrf.valley
     lr = 1e-2
-    b = learner.dls.train.one_batch()
+    b = learn.dls.train.one_batch()
     logging.info(f'lr found through lr_find: {lr}')
-    logging.info(f'batch len: {len(b)}, shape: {b[0].shape}')
-    logging.info(f'callbacks added: {learner.cbs}')
-    #logging.info(f'smooth loss: {learner.smooth_loss}')
-    #logging.info(learner.summary())
-    #learner.lr_find()
-    learner.fit(args.max_epochs, lr)
+    logging.info(f'batch len: {len(b[0])}, shape: {b[0].shape}')
+    logging.info(f'callbacks added: {learn.cbs}')
+    learn.fit(args.max_epochs, lr)
 
 if __name__ == "__main__":
     main()

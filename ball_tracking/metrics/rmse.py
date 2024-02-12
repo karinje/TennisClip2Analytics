@@ -42,11 +42,14 @@ if __name__=="__main__":
     dls, data_config = ballg_d.get_dls(), ballg_d.config()
     logging.info(f'data config: {data_config}')
     model = TrackNet(data_config)
-    learner = CreateLearner(model, dls, args).get_learner() 
+    learner = CreateLearner(model, dls, [], args).get_learner() 
     b = learner.dls.valid.one_batch()
+    test_map = ballg_d.get_y()(learner.dls.valid.items[0]).argmax()
+    logging.info(f'target shape: {b[3].shape} and test_map: {test_map//1280},{test_map%1280}')
     rmse = RMSEArgmax()
-    gt = torch.tensor(list(map(base_d.get_y(),(learner.dls.valid.items[0],learner.dls.valid.items[1]))))
+    gt = torch.tensor(list(map(base_d.get_y(),learner.dls.valid.items[0:args.samples_per_batch])))
     pred = mask2coord(b[3]).cpu()*2
+    logging.info(f'{learner.dls.valid.items[0]}')
     logging.info(f'gt: {gt}, pred: {pred}')
     logging.info(f'rmse: {rmse.r2_dist(gt,pred)}')
     # python ~/git/ball_tracking_3d/ball_tracking/data/data_module.py --train_data_path /Users/sanjaykarinje/Downloads/Dataset 

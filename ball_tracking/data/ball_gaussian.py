@@ -52,14 +52,14 @@ class BallGaussianDataModule(BaseDataModule):
             out_arr = np.zeros((HEIGHT+2*size, WIDTH+2*size))
             logging.debug(f'Ball Coords: {(x,y)},Types: {type(x), type(y)}, Output Arr Shape: {out_arr.shape}, X Slice: {slice(x, x+2*size+1)}, Y Slice: {slice(y, y+2*size+1)}')
             logging.debug(f'out arr sliced shape: {out_arr[slice(y, y+2*size+1), slice(x, x+2*size+1)].shape}, gaussian kernal shape: {kernel_func(size, variance).shape}')
-            out_arr[slice(y, y+2*size+1), slice(x, x+2*size+1)] = kernel_func(size, variance)*(self.output_classes-1)
-            return tensor(out_arr[size:-size, size:-size]).short()
+            out_arr[slice(y, y+2*size+1), slice(x, x+2*size+1)] = kernel_func(size, variance)*255
+            return tensor(out_arr[size:-size, size:-size])
         return _get_y
 
     def get_blocks(self):
         blocks = super().get_blocks()
         codes = np.arange(self.output_classes)
-        blocks[-1] = MaskBlock(codes)
+        blocks[-1] = MaskBlock(codes) 
         return blocks
 
     def print_info(self):
