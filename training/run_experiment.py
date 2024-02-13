@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from ball_tracking.learner import CreateLearner
 from ball_tracking.callbacks import ShortEpochCallbackFixed, ShortEpochBothCallback 
-from ball_tracking.metrics import RMSEArgmax, PredStats 
+from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresentPct, PredVarX, PredVarY 
 from training.util import DATA_CLASS_MODULE, MODEL_CLASS_MODULE, import_class, setup_data_and_model_from_args
 from torch.profiler import profile, record_function, ProfilerActivity
 import logging
@@ -133,8 +133,8 @@ def main():
     args = parser.parse_args()
     #default_device(False)
     data, model = setup_data_and_model_from_args(args)
-    rmse, pred_stats = RMSEArgmax(), PredStats() 
-    setup_learner = CreateLearner(model, data.get_dls(), [rmse, pred_stats], args)
+    rmse_p, rmse_a, bp_pct, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresentPct(), PredVarX(), PredVarY()
+    setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_pct, pred_rmse_x, pred_rmse_y], args)
     data.print_info()
     model.print_info()
     setup_learner.print_info()
@@ -162,9 +162,10 @@ def main():
             lrf = learner.lr_find() 
             print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cuda_time_total", row_limit=2))
     else:
-        lrf = learn.lr_find()
+        pass
+        #lrf = learn.lr_find()
 
-    lr = lrf.valley
+    #lr = lrf.valley
     lr = 1e-2
     b = learn.dls.train.one_batch()
     logging.info(f'lr found through lr_find: {lr}')

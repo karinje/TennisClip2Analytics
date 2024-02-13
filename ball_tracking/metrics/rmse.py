@@ -7,29 +7,45 @@ from ball_tracking.metrics.utils import mask2coord
 import argparse
 import logging
 import torch
+import numpy as np
+from fastbook import default_device 
 logging.basicConfig(level=logging.DEBUG)
 
-class RMSEArgmax(Metric):
+class BallPresentRMSE(Metric):
     def __init__(self):
-      self.r2_dist_acc = 0
-      self.r2_count = 0
+      self.avg_dist_a, self.avg_dist_p = [], [] 
+      self.y_absent = torch.tensor([0,0]).to(default_device())
 
     def r2_dist(self, a, b):
       return torch.sqrt(torch.pow(a-b,2).mean(axis=-1))
 
     def accumulate(self, learn):
       preds,y = mask2coord(learn.pred), mask2coord(learn.y)
-      self.r2_dist_acc += self.r2_dist(preds, y).sum()
-      self.r2_count += len(preds)
+      dist = self.r2_dist(preds, y)
+      for y_i, dist_i in zip(y, dist):
+          if torch.equal(y_i, self.y_absent):
+              self.avg_dist_a.append(dist_i.item())
+          else:
+              self.avg_dist_p.append(dist_i.item())
 
     def reset(self):
-        self.r2_dist_acc = 0
-        self.r2_count = 0
+        self.avg_dist_a, self.avg_dist_p = [], [] 
 
     @property
-    def value(self):
-        return self.r2_dist_acc / (self.r2_count+1)
-##
+    def value(self): return np.mean(self.avg_dist_p)
+
+
+class BallAbsentRMSE(BallPresentRMSE):
+    
+    @property
+    def value(self): return np.mean(self.avg_dist_a)
+
+
+class BallPresentPct(BallPresentRMSE):
+    
+    @property
+    def value(self): return 1/(1+len(self.avg_dist_a)/len(self.avg_dist_p))
+
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(add_help=True)
@@ -46,12 +62,12 @@ if __name__=="__main__":
     b = learner.dls.valid.one_batch()
     test_map = ballg_d.get_y()(learner.dls.valid.items[0]).argmax()
     logging.info(f'target shape: {b[3].shape} and test_map: {test_map//1280},{test_map%1280}')
-    rmse = RMSEArgmax()
+    rmse_p, rmse_a, bp_pct = BallPresentRMSE(), BallAbsentRMSE(), BallPresentPct()
     gt = torch.tensor(list(map(base_d.get_y(),learner.dls.valid.items[0:args.samples_per_batch])))
     pred = mask2coord(b[3]).cpu()*2
     logging.info(f'{learner.dls.valid.items[0]}')
     logging.info(f'gt: {gt}, pred: {pred}')
-    logging.info(f'rmse: {rmse.r2_dist(gt,pred)}')
+    logging.info(f'rmse: {rmse_p.r2_dist(gt,pred)}')
     # python ~/git/ball_tracking_3d/ball_tracking/data/data_module.py --train_data_path /Users/sanjaykarinje/Downloads/Dataset 
     #                                                                 --infer_data_path /Users/sanjaykarinje/Downloads/match_frames 
 

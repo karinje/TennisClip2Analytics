@@ -10,7 +10,7 @@ import torch
 from fastbook import default_device
 logging.basicConfig(level=logging.DEBUG)
 
-class PredStats(Metric):
+class PredVarX(Metric):
 
     def __init__(self):
       self.all_preds = torch.tensor([]).to(default_device())
@@ -24,7 +24,12 @@ class PredStats(Metric):
 
     @property
     def value(self):
-        return self.all_preds.mean(axis=0).cpu(), self.all_preds.std(axis=0).cpu()
+        return self.all_preds.std(axis=0)[0]
+
+class PredVarY(PredVarX):
+    @property
+    def value(self):
+        return self.all_preds.std(axis=0)[1]
 
 if __name__=="__main__":
     print(f'{default_device()}')
