@@ -57,6 +57,7 @@ if __name__=="__main__":
     parser = TrackNet.add_to_argparser(parser)
     parser = CreateLearner.add_to_argparse(parser)
     args = parser.parse_args()
+    default_device(False)
     data_module = BallGaussianDataModule(args) 
     data_module.print_info()
     dls, data_config = data_module.get_dls(), data_module.config()
@@ -65,6 +66,13 @@ if __name__=="__main__":
     setup_learner = CreateLearner(model, dls, [], args)
     learn = setup_learner.get_learner() 
     setup_learner.print_info()
+    b = learn.dls.valid.one_batch()
+    logging.info(f'batch datatypes: {b[0].shape}, {b[3].shape}')
+    gt = b[3]
+    pred = learn.model(*b[:3])
+    pred =b[3]*0.1
+    logging.info(f'{gt.dtype}, {pred.dtype}')
+    logging.info(f'sample loss: {setup_learner.loss_fn(pred, gt)}')
     #logging.info(learner.summary())
     # print(f'{default_device(), defaults.use_cuda}')
     # learner.lr_find()

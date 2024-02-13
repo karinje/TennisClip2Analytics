@@ -14,7 +14,8 @@ logging.basicConfig(level=logging.DEBUG)
 class BallPresentRMSE(Metric):
     def __init__(self):
       self.avg_dist_a, self.avg_dist_p = [], [] 
-      self.y_absent = torch.tensor([0,0]).to(default_device())
+      self.below5_a, self.below5_p = 0, 0
+      self.y_absent = (torch.tensor([2,1]).to(default_device()), torch.tensor([1,1]).to(default_device()))
 
     def r2_dist(self, a, b):
       return torch.sqrt(torch.pow(a-b,2).mean(axis=-1))
@@ -23,29 +24,30 @@ class BallPresentRMSE(Metric):
       preds,y = mask2coord(learn.pred), mask2coord(learn.y)
       dist = self.r2_dist(preds, y)
       for y_i, dist_i in zip(y, dist):
-          if torch.equal(y_i, self.y_absent):
-              self.avg_dist_a.append(dist_i.item())
-          else:
-              self.avg_dist_p.append(dist_i.item())
+        if torch.equal(y_i,self.y_absent[0]) or torch.equal(y_i,self.y_absent[1]):
+            self.avg_dist_a.append(dist_i.item())
+            if dist_i<=5: self.below5_a += 1
+        else:
+            self.avg_dist_p.append(dist_i.item())
+            if dist_i<=5: self.below5_p += 1
+          
 
     def reset(self):
-        self.avg_dist_a, self.avg_dist_p = [], [] 
+        self.avg_dist_a, self.avg_dist_p = [], []
+        self.below5_a, self.below5_p = 0, 0
 
     @property
     def value(self): return np.mean(self.avg_dist_p)
 
 
 class BallAbsentRMSE(BallPresentRMSE):
-    
     @property
     def value(self): return np.mean(self.avg_dist_a)
 
 
-class BallPresentPct(BallPresentRMSE):
-    
+class BallPresent5px(BallPresentRMSE):
     @property
-    def value(self): return 1/(1+len(self.avg_dist_a)/len(self.avg_dist_p))
-
+    def value(self): return self.below5_p/len(self.avg_dist_p)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(add_help=True)

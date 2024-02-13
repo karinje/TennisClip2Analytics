@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from ball_tracking.learner import CreateLearner
 from ball_tracking.callbacks import ShortEpochCallbackFixed, ShortEpochBothCallback 
-from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresentPct, PredVarX, PredVarY 
+from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresent5px, PredVarX, PredVarY 
 from training.util import DATA_CLASS_MODULE, MODEL_CLASS_MODULE, import_class, setup_data_and_model_from_args
 from torch.profiler import profile, record_function, ProfilerActivity
 import logging
@@ -19,7 +19,6 @@ torch.manual_seed(42)
 def _setup_parser():
     """Set up Python's ArgumentParser with data, model, trainer, and other arguments."""
     parser = argparse.ArgumentParser(add_help=False)
-
     # Add Trainer specific arguments, such as --max_epochs, --gpus, --precision
     learner_parser = CreateLearner.add_to_argparse(parser)
     learner_parser._action_groups[1].title = "Learner Args"
@@ -31,6 +30,12 @@ def _setup_parser():
         default=1,
         help="Specify number of epochs"
     )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=None,
+        help="Specify lr"
+        )
     parser.add_argument(
         "--gpus",
         type=int,
@@ -133,8 +138,9 @@ def main():
     args = parser.parse_args()
     #default_device(False)
     data, model = setup_data_and_model_from_args(args)
-    rmse_p, rmse_a, bp_pct, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresentPct(), PredVarX(), PredVarY()
-    setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_pct, pred_rmse_x, pred_rmse_y], args)
+    rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresentPct(), PredVarX(), PredVarY()
+    setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y], args)
+    logging.info(f'device: {default_device()}')
     data.print_info()
     model.print_info()
     setup_learner.print_info()
@@ -146,8 +152,6 @@ def main():
     log_dir = Path("training") / "logs"
     log_dir.mkdir(exist_ok=True, parents=True)
 
-    if args.short_epoch < 1:
-        learn.add_cb(ShortEpochBothCallback(pct=args.short_epoch, short_valid=False))
 
     if args.save_model:
         learn.add_cb(SaveModelCallback(every_epoch=False, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
@@ -162,16 +166,20 @@ def main():
             lrf = learner.lr_find() 
             print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cuda_time_total", row_limit=2))
     else:
-        pass
-        #lrf = learn.lr_find()
+        lrf = learn.lr_find()
 
-    #lr = lrf.valley
-    lr = 1e-2
+    if args.short_epoch < 1:
+        learn.add_cb(ShortEpochBothCallback(pct=args.short_epoch, short_valid=False))
+    
+    lr = lrf.valley if args.lr is None else args.lr
     b = learn.dls.train.one_batch()
-    logging.info(f'lr found through lr_find: {lr}')
+    #logging.info(f'LR find results:')
+    #for k,v in zip(learn.recorder.lrs,learn.recorder.losses):
+    #    logging.info(f'{k}:{v.item()}')
+    logging.info(f'final lr: {lr}')
     logging.info(f'batch len: {len(b[0])}, shape: {b[0].shape}')
     logging.info(f'callbacks added: {learn.cbs}')
-    learn.fit(args.max_epochs, lr)
+    learn.fit(args.max_epochs, args.lr)
 
 if __name__ == "__main__":
     main()
