@@ -138,7 +138,7 @@ def main():
     args = parser.parse_args()
     #default_device(False)
     data, model = setup_data_and_model_from_args(args)
-    rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresentPct(), PredVarX(), PredVarY()
+    rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresent5px(), PredVarX(), PredVarY()
     setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y], args)
     logging.info(f'device: {default_device()}')
     data.print_info()
@@ -160,12 +160,12 @@ def main():
         learn.add_cb(WandbCallback(log_preds=False))
     else:
         learn.add_cb(TensorBoardCallback(log_dir=log_dir, trace_model=False, log_preds=False))
-
     if args.profile:
         with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],with_stack=True) as prof:
             lrf = learner.lr_find() 
             print(prof.key_averages(group_by_stack_n=5).table(sort_by="self_cuda_time_total", row_limit=2))
     else:
+        pass
         lrf = learn.lr_find()
 
     if args.short_epoch < 1:

@@ -24,12 +24,13 @@ class BallPresentRMSE(Metric):
       preds,y = mask2coord(learn.pred), mask2coord(learn.y)
       dist = self.r2_dist(preds, y)
       for y_i, dist_i in zip(y, dist):
+        #logging.info(f'checking distance: {dist_i.item()}')
         if torch.equal(y_i,self.y_absent[0]) or torch.equal(y_i,self.y_absent[1]):
             self.avg_dist_a.append(dist_i.item())
-            if dist_i<=5: self.below5_a += 1
+            if dist_i.item()<=5: self.below5_a += 1
         else:
             self.avg_dist_p.append(dist_i.item())
-            if dist_i<=5: self.below5_p += 1
+            if dist_i.item()<=5: self.below5_p += 1
           
 
     def reset(self):
