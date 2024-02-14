@@ -13,14 +13,14 @@ logging.basicConfig(level=logging.DEBUG)
 class PredVarX(Metric):
 
     def __init__(self):
-      self.all_preds = torch.tensor([]).to(default_device())
+      self.all_preds = torch.tensor([]).to('cpu')
 
     def accumulate(self, learn):
       preds,y = mask2coord(learn.pred), mask2coord(learn.y)
       self.all_preds = torch.cat((self.all_preds, preds), axis=0)
 
     def reset(self):
-        self.all_preds = torch.tensor([]).to(default_device())
+        self.all_preds = torch.tensor([]).to('cpu')
 
     @property
     def value(self):
