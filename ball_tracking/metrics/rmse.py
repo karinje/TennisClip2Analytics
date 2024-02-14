@@ -27,7 +27,9 @@ class BallPresentRMSE(Metric):
       #logging.info(f'preds: {preds} and y: {y}')
       dist = self.r2_dist(preds, y)
       for y_i, dist_i in zip(y, dist):
+        #logging.info(f'yi: {y_i} and dist missing: {self.r2_dist(y_i,self.y_absent).item()} and dist_i: {dist_i}')
         if self.r2_dist(y_i,self.y_absent).item()<5:
+            #logging.info(f'entering absent')
             self.avg_dist_a.append(dist_i.item())
             if dist_i.item()<=10: self.below5_a += 1
         else:
@@ -51,6 +53,10 @@ class BallAbsentRMSE(BallPresentRMSE):
 class BallPresent5px(BallPresentRMSE):
     @property
     def value(self): return self.below5_p/len(self.avg_dist_p)
+
+class BallAbsent5px(BallPresentRMSE):
+    @property
+    def value(self): return self.below5_a/len(self.avg_dist_a)
 
 if __name__=="__main__":
     print(f'default device: {default_device()}')

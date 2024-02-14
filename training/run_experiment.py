@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from ball_tracking.learner import CreateLearner
 from ball_tracking.callbacks import ShortEpochCallbackFixed, ShortEpochBothCallback 
-from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresent5px, PredVarX, PredVarY 
+from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresent5px, BallAbsent5px, PredVarX, PredVarY 
 from training.util import DATA_CLASS_MODULE, MODEL_CLASS_MODULE, import_class, setup_data_and_model_from_args
 from torch.profiler import profile, record_function, ProfilerActivity
 import logging
@@ -138,8 +138,8 @@ def main():
     args = parser.parse_args()
     #default_device(False)
     data, model = setup_data_and_model_from_args(args)
-    rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresent5px(), PredVarX(), PredVarY()
-    setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_5px, pred_rmse_x, pred_rmse_y], args)
+    rmse_p, rmse_a, bp_5px, ba_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresent5px(), BallAbsent5px(), PredVarX(), PredVarY()
+    setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_5px, ba_5px, pred_rmse_x, pred_rmse_y], args)
     logging.info(f'device: {default_device()}')
     data.print_info()
     model.print_info()
@@ -154,7 +154,7 @@ def main():
 
 
     if args.save_model:
-        learn.add_cb(SaveModelCallback(every_epoch=False, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
+        learn.add_cb(SaveModelCallback(every_epoch=True, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
 
     if args.wandb:
         learn.add_cb(WandbCallback(log_preds=False))
