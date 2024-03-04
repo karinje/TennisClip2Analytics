@@ -20,7 +20,7 @@ class BallPresentRMSE(Metric):
       self.y_absent = torch.tensor([0,0]).to('cpu')
 
     def r2_dist(self, a, b):
-      return torch.sqrt(torch.pow(a-b,2).mean(dim=-1))
+      return torch.sqrt(torch.pow(a-b,2).sum(dim=-1))
 
     def accumulate(self, learn):
       preds,y = mask2coord(learn.pred), mask2coord(learn.y)
@@ -52,11 +52,11 @@ class BallAbsentRMSE(BallPresentRMSE):
 
 class BallPresent5px(BallPresentRMSE):
     @property
-    def value(self): return self.below5_p/len(self.avg_dist_p)
+    def value(self): return self.below5_p/(len(self.avg_dist_p)+1)
 
 class BallAbsent5px(BallPresentRMSE):
     @property
-    def value(self): return self.below5_a/len(self.avg_dist_a)
+    def value(self): return self.below5_a/(len(self.avg_dist_a)+1)
 
 if __name__=="__main__":
     print(f'default device: {default_device()}')

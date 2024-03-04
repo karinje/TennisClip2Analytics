@@ -4,6 +4,7 @@ from fastbook import *
 import numpy as np
 import pandas as pd
 import torch
+import wandb 
 from ball_tracking.learner import CreateLearner
 from ball_tracking.callbacks import ShortEpochCallbackFixed, ShortEpochBothCallback 
 from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresent5px, BallAbsent5px, PredVarX, PredVarY 
@@ -11,6 +12,8 @@ from training.util import DATA_CLASS_MODULE, MODEL_CLASS_MODULE, import_class, s
 from torch.profiler import profile, record_function, ProfilerActivity
 import logging
 from fastai.callback.tensorboard import * 
+from fastai.callback.wandb import *
+
 # In order to ensure reproducible experiments, we must set random seeds.
 np.random.seed(42)
 torch.manual_seed(42)
@@ -79,6 +82,18 @@ def _setup_parser():
         help=f"String identifier for the model class, relative to {MODEL_CLASS_MODULE}.",
     )
     parser.add_argument(
+        "--half_precision",
+        action="store_true",
+        default=False,
+        help="specify whether half precision training"
+    )
+    parser.add_argument(
+        "--schedule_lr",
+        action="store_true",
+        default=False,
+        help="enable reduce lr on plateau scheduler"
+    )
+    parser.add_argument(
         "--load_learner", type=str, default=None, help="If passed, loads a learner from the provided path."
     )
     parser.add_argument(
@@ -107,7 +122,6 @@ def _setup_parser():
     parser.add_argument("--help", "-h", action="help")
     return parser
 
-
 def _ensure_logging_dir(experiment_dir):
     """Create the logging directory via the rank-zero process, if necessary."""
     Path(experiment_dir).mkdir(parents=True, exist_ok=True)
@@ -134,11 +148,13 @@ def main():
     ```
     python training/run_experiment.py --model_class=TrackNet --data_class=BallGaussianDataModule --help
     """
+    wandb.init(project='test')
     parser = _setup_parser()
     args = parser.parse_args()
-    #default_device(False)
+    #default_device(False)i
     data, model = setup_data_and_model_from_args(args)
-    rmse_p, rmse_a, bp_5px, ba_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresent5px(), BallAbsent5px(), PredVarX(), PredVarY()
+    rmse_p, rmse_a, bp_5px, ba_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresent5px(), \
+                                                               BallAbsent5px(), PredVarX(), PredVarY()
     setup_learner = CreateLearner(model, data.get_dls(), [rmse_p, rmse_a, bp_5px, ba_5px, pred_rmse_x, pred_rmse_y], args)
     logging.info(f'device: {default_device()}')
     data.print_info()
@@ -157,7 +173,7 @@ def main():
         learn.add_cb(SaveModelCallback(every_epoch=True, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
 
     if args.wandb:
-        learn.add_cb(WandbCallback(log_preds=False))
+        learn.add_cb(WandbCallback(log_preds=False, log_model=True))
     else:
         learn.add_cb(TensorBoardCallback(log_dir=log_dir, trace_model=False, log_preds=False))
     if args.profile:
@@ -179,6 +195,10 @@ def main():
     logging.info(f'final lr: {lr}')
     logging.info(f'batch len: {len(b[0])}, shape: {b[0].shape}')
     logging.info(f'callbacks added: {learn.cbs}')
+    if args.schedule_lr:
+        learn.add_cb(ReduceLROnPlateau(patience=2, factor=10, min_lr=1e-6))
+    if args.half_precision:
+        learn = learn.to_fp16()
     learn.fit(args.max_epochs, args.lr)
 
 if __name__ == "__main__":
