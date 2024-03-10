@@ -47,6 +47,7 @@ def _setup_parser():
 
     # Get the data and model classes, so that we can add their specific arguments
     temp_args, _ = parser.parse_known_args()
+    print(f'TESTING: {temp_args.data_class} and {temp_args.model_class}')
     data_class = import_class(f"{DATA_CLASS_MODULE}.{temp_args.data_class}")
     model_class = import_class(f"{MODEL_CLASS_MODULE}.{temp_args.model_class}")
 
@@ -83,20 +84,19 @@ def main():
     test_dl = learn.dls.test_dl(test_files)
     all_preds, all_ys = torch.tensor([]).to(def_device), torch.tensor([]).to(def_device)
     infer_dl = learn.dls.valid if args.mode=="valid" else test_dl
-    print(infer_dl.items)
     for idx,batch in enumerate(infer_dl):
        if idx%100==0: print(f'idx: {idx}')
-       pred, y = mask2coord(learn.model.to(def_device)(*batch[:3])), mask2coord(batch[3]) if len(batch)==4 else torch.tensor([[0,0]])
+       pred, y = mask2coord(learn.model.to(def_device)(*batch[:args.num_inp_images])), mask2coord(batch[args.num_inp_images]) if len(batch)==4 else torch.tensor([[0,0]])
        all_preds = torch.cat((all_preds, pred.to(def_device)), axis=0)
        #logging.info(f'idx: {idx}, {pred}')
        all_ys = torch.cat((all_ys, y.to(def_device)), axis=0)
     
-    
+    test_name = Path(args.infer_data_path).name 
     results_df = pd.concat(map(pd.DataFrame, (all_preds.cpu().numpy(), all_ys.cpu().numpy())), axis=1)
     results_df.columns = ['pred_x', 'pred_y', 'gt_x', 'gt_y']
     results_df['r2'] = np.sqrt((results_df['pred_x']-results_df['gt_x'])**2+(results_df['pred_y']-results_df['gt_y'])**2).round()
     results_df.index = pd.array(infer_dl.items)
-    results_df.to_csv(f'{args.mode}_set_results.csv')
+    results_df.to_csv(f'{args.mode}_{test_name}_set_results.csv')
 
 
 if __name__ == "__main__":

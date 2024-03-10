@@ -59,8 +59,8 @@ def _setup_parser():
 
     parser.add_argument(
         "--wandb",
-        action="store_true",
-        default=False,
+        type=str,
+        default="True",
         help="If passed, logs experiment results to Weights & Biases. Otherwise logs only to local Tensorboard.",
     )
     parser.add_argument(
@@ -83,27 +83,30 @@ def _setup_parser():
     )
     parser.add_argument(
         "--half_precision",
-        action="store_true",
-        default=False,
+        type=str,
+        default="False",
         help="specify whether half precision training"
     )
     parser.add_argument(
         "--schedule_lr",
-        action="store_true",
-        default=False,
+        type=str,
+        default="True",
         help="enable reduce lr on plateau scheduler"
     )
     parser.add_argument(
         "--load_learner", type=str, default=None, help="If passed, loads a learner from the provided path."
     )
     parser.add_argument(
-        "--save_model", type=str, default=None, help="save learner"
+        "--save_model", 
+        type=str,
+        default="False",
+        help="save learner"
     )
     parser.add_argument(
-        "--wandb_project", type=str, default='test', help="project name for wandb experiment"
+        "--wandb_project", type=str, default='ball_tracking_experiments', help="project name for wandb experiment"
     )
     parser.add_argument(
-        "--num_inp_images_target_img_position", type=str, default=None, help="for wandb experiment"
+        "--num_inp_images_target_img_position", type=str, default='3,3', help="for wandb experiment"
     )
     parser.add_argument(
         "--stop_early",
@@ -139,11 +142,9 @@ def main():
     """
     parser = _setup_parser()
     args = parser.parse_args()
-    n, t = args.num_inp_images_target_img_position.split(',')
-    args.num_inp_images, args.target_img_position = n, t
-    logging.info(f'checking if split works: {args.num_inp_images} and {args.target_img_position}')
+    n, t = args.num_inp_images_target_img_position.split('.')
+    args.num_inp_images, args.target_img_position = int(n), int(t)
     with wandb.init(project=args.wandb_project, config=args):
-        args = wandb.config
         data, model = setup_data_and_model_from_args(args)
         rmse_p, rmse_a, bp_5px, ba_5px, pred_rmse_x, pred_rmse_y = BallPresentRMSE(), BallAbsentRMSE(), BallPresent5px(), \
                                                                    BallAbsent5px(), PredVarX(), PredVarY()
@@ -155,15 +156,13 @@ def main():
         learn = setup_learner.get_learner()
 
         if args.load_learner is not None:
-            learn = learn.load(args.load_checkpoint)
+            learn = learn.load(args.load_learner)
 
             log_dir = Path("training") / "logs"
             log_dir.mkdir(exist_ok=True, parents=True)
 
-        if args.save_model:
-            learn.add_cb(SaveModelCallback(every_epoch=True, at_end=False, with_opt=True, reset_on_fit=True, fname=args.save_model))
 
-        if args.wandb:
+        if args.wandb=="True":
             learn.add_cb(WandbCallback(log_preds=False, log_model=True))
         else:
             learn.add_cb(TensorBoardCallback(log_dir=log_dir, trace_model=False, log_preds=False))
@@ -176,11 +175,20 @@ def main():
         if args.short_epoch < 1:
             learn.add_cb(ShortEpochBothCallback(pct=args.short_epoch, short_valid=False))
 
-        if args.schedule_lr:
-            learn.add_cb(ReduceLROnPlateau(patience=2, factor=10, min_lr=1e-6))
+        if args.schedule_lr=="True":
+            learn.add_cb(ReduceLROnPlateau(patience=2, min_delta=1e-4, factor=10, min_lr=1e-6))
 
-        if args.half_precision:
+        if args.half_precision=="True":
             learn = learn.to_fp16()
+
+        save_file =   str(args.save_model) + "_"  \
+                    + str(args.model_class) + "-" \
+                    + str(args.loss) + "-"        \
+                    + str(args.num_inp_images_target_img_position) + "_" \
+                    + str(args.lr) + "_"          \
+                    + "fp16_" + str(args.half_precision)
+        if args.save_model!="False":
+            learn.add_cb(SaveModelCallback(every_epoch=True, at_end=False, with_opt=True, reset_on_fit=True, fname=save_file))
 
         lr = args.lr
         b = learn.dls.train.one_batch()

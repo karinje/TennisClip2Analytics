@@ -7,8 +7,8 @@ import logging
 import re
 import math
 
-TRAIN_DATA ='/Users/sanjaykarinje/Downloads/Dataset/'
-INFER_DATA = '/Users/sanjaykarinje//Downloads/match_frames'
+TRAIN_DATA ='/home/ubuntu/test-storage/Users/sanjaykarinje/Downloads/Dataset/'
+INFER_DATA = '/home/ubuntu/test-storage/Users/sanjaykarinje//Downloads/match_frames'
 NUM_INP_IMGS = 3 
 OUTPUT_CLASSES = 256
 IMG_RESIZE = (360,640)
@@ -132,6 +132,8 @@ class BaseDataModule(object):
         logging.info(f'Sample File: {sample_f}')
         logging.info(f'check get_xs: {[func(sample_f) for func in self.get_xs()]}')
         logging.info(f'check get_y: {self.get_y()(sample_f)}')
+        test_dls = self.get_dls()
+        logging.info(f'{test_dls.valid.one_batch()[0].shape}')
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(add_help=True)

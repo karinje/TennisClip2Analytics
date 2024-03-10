@@ -4,7 +4,8 @@ from fastbook import *
 import numpy as np
 import pandas as pd
 import torch
-import wandb 
+import wandb
+import sys
 from ball_tracking.learner import CreateLearner
 from ball_tracking.callbacks import ShortEpochCallbackFixed, ShortEpochBothCallback 
 from ball_tracking.metrics import BallPresentRMSE, BallAbsentRMSE, BallPresent5px, BallAbsent5px, PredVarX, PredVarY 
@@ -148,6 +149,7 @@ def main():
     ```
     python training/run_experiment.py --model_class=TrackNet --data_class=BallGaussianDataModule --help
     """
+    print(sys.path)
     wandb.init(project='test')
     parser = _setup_parser()
     args = parser.parse_args()

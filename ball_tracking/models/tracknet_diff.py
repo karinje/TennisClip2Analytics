@@ -12,8 +12,14 @@ logging.basicConfig(level=logging.DEBUG)
 class TrackNetDiff(TrackNet):
     """Create TrackNet Diff which uses difference between inps to feed the model"""
     def forward(self, *args):
-        i1, i2, i3 = args[1]-args[0], args[1], args[2]-args[1]
-        x_cat = torch.cat((i1,i2,i3), dim=1)
+        if len(args)==1:
+            x_cat = args[0]
+        elif len(args)==3:
+            all_is = (args[1]-args[0], args[1], args[2]-args[1])
+            x_cat = torch.cat(all_is, dim=1)
+        elif len(args)==5:
+            all_is = (args[2]-args[0], args[2]-args[1], args[2], args[3]-args[2], args[4]-args[2]) 
+            x_cat = torch.cat(all_is, dim=1)
         return self.us(self.ds(x_cat))*self.output_scale
 
     @staticmethod
