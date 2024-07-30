@@ -1,0 +1,30 @@
+# Video-specific information
+video_name: "usopen_2013_1.0"
+base_dir: "/Users/sanjaykarinje/Downloads"
+
+# YouTube video information
+match_url: "https://www.youtube.com/watch?v=qg4wqo02gfc"
+start_time: "01:00:00"
+end_time: "02:00:00"
+
+# Model and processing parameters
+model_path: "models/model_tennis_court_det.pt"
+num_cores: 8
+part_size: 500
+ref_image: "img_0900.jpg"
+
+# Inference parameters
+train_data_path: "/Users/sanjaykarinje/Downloads/Dataset"
+samples_per_batch: 2
+load_learner: "cont_noact_tracknet_ce_1e-3_3"
+
+# ViTPose parameters
+det_model_name: "YOLOX-l"
+pose_model_name: "ViTPose-H"
+start_row: 1
+end_row: 1000
+step: 1
+
+
+# Shared directory for input files that don't change between runs
+shared_input_dir: "/Users/sanjaykarinje/Downloads/shared_inputs"

@@ -1,0 +1,23 @@
+export match_url='https://www.youtube.com/watch?v=qg4wqo02gfc'
+
+python scripts/youtube-downloader-ffmpeg-subclip.py --url  --start_time 01:00:00 --end_time 02:00:00 --output_file ~/Downloads/usopen_2013_2.0.mp4 --extract_frames
+
+export ref_image='/Users/sanjaykarinje/Downloads/usopen_2013_1.0/img_0900.jpg'
+
+python TennisCourtDetector/infer_in_image.py --input_path /Users/sanjaykarinje/Downloads/usopen_2013_1.0/img_0900.jpg --model_path models/model_tennis_court_det.pt --output_path tmp.txt --use_refine_kps --use_homography
+
+python scripts/tennis-court-filter-script.py --input_dir /Users/sanjaykarinje/Downloads/usopen_2013_2.0_frames_tmp --ref_img ~/Downloads/usopen_2013_1.0/img_0900.jpg --court_kp_file court_kp_v2.txt --output_dir filter_frames --num_cores 8 --part_size 500
+
+python training/run_inference.py --infer_data_path /Users/sanjaykarinje/Downloads/usopen_2013_2.0_frames_tmp --train_data_path /Users/sanjaykarinje/Downloads/Dataset --mode test --samples_per_batch 2 --load_learner cont_noact_tracknet_ce_1e-3_3
+
+python ViTPose/model_v3.py --det_model_name 'YOLOX-l' --pose_model_name 'ViTPose-H' --clip_csv ../TennisCourtDetector/usopen_2013_1_processed.csv --output_dir new_test --show_viz --start_row 1 --end_row 1000 --step 1
+
+python scripts/data-preparation-script.py --bbox_file1 '/Users/sanjaykarinje/Downloads/20k_usopen_2013_1_processed_res.json' --bbox_file2 '/Users/sanjaykarinje/Downloads/usopen_2013_1_processed_res.json' --ball_file '/Users/sanjaykarinje/Downloads/test_usopen_2013_1.0_valid_imgs.txt_set_results.csv' --court_file '/Users/sanjaykarinje/Downloads/usopen_2013_1_processed.csv' --output_file data_prep_results.csv
+
+python scripts/fix_outliers.py --override_file usopen_2013_1.0_override.csv --input_file ~/Downloads/tmp_data_processed.csv --output_file usopen_2013_1.0_fixed.csv --debug
+
+python scripts/identify_serve_endofpoint.py --input_file usopen_2013_1.0_fixed.csv --output_dict_file usopen_2013_1.0_serve_end_pts.pkl --output_df_file usopen_2013_1.0_serve_endofpoint_df_out.csv --local_img_folder /Users/sanjaykarinje/Downloads/usopen_2013_1.0/ --debug
+
+python scripts/identify_hits_and_bounce.py --input_file usopen_2013_1.0_serve_endofpoint_df_out.pkl --serve_endofpoint_dict_file usopen_2013_1.0_serve_end_pts.pkl --hit_override_file usopen_2013_1.0.hit_override.csv --output_file usopen_2013_1.0_hit_pts.pkl
+
+python scripts/identify_final_points.py --input_df_file usopen_2013_1.0_hit_bounce_df.pkl --input_dict_file usopen_2013_1.0_hit_bounce_pts.pkl --points_override_file points_override.csv --points_drop_file points_drop.csv --local_img_folder /Users/sanjaykarinje/Downloads/usopen_2013_1.0/ --court_kp_file court_kp_v2.txt --output_df_file usopen_2013_1.0_final_df.csv
