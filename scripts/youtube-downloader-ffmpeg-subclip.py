@@ -1,5 +1,5 @@
 import argparse
-from pytube import YouTube
+from pytubefix import YouTube
 from pathlib import Path
 import subprocess
 from tqdm import tqdm
