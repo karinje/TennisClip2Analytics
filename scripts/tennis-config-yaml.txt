@@ -11,7 +11,6 @@ end_time: "02:00:00"
 model_path: "models/model_tennis_court_det.pt"
 num_cores: 8
 part_size: 500
-ref_image: "img_0900.jpg"
 
 # Inference parameters
 train_data_path: "/Users/sanjaykarinje/Downloads/Dataset"
@@ -25,6 +24,16 @@ start_row: 1
 end_row: 1000
 step: 1
 
+# Additional parameters
+ref_image: "img_0900.jpg"
 
 # Shared directory for input files that don't change between runs
 shared_input_dir: "/Users/sanjaykarinje/Downloads/shared_inputs"
+
+# Step control (set to false to skip a step, or provide a list to run only specific steps)
+steps_to_run:
+  - "all"  # Set to "all" to run all steps, or provide a list of step names to run only those steps
+  # Example of running only specific steps:
+  # - "download_and_extract"
+  # - "court_detection"
+  # - "frame_filtering"

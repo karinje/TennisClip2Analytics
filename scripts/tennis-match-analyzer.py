@@ -15,6 +15,9 @@ def run_command(command, step_name):
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Completed {step_name}")
     return stdout.decode()
 
+def should_run_step(step_name, steps_to_run):
+    return "all" in steps_to_run or step_name in steps_to_run
+
 def main(config_file):
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting tennis match analysis")
     
@@ -24,6 +27,7 @@ def main(config_file):
     video_name = config['video_name']
     base_dir = config['base_dir']
     shared_input_dir = config['shared_input_dir']
+    steps_to_run = config.get('steps_to_run', ['all'])
 
     print(f"Processing video: {video_name}")
 
@@ -57,44 +61,54 @@ def main(config_file):
     points_drop_file = os.path.join(shared_input_dir, f"{video_name}_points_drop.csv")
 
     # YouTube video download and frame extraction
-    run_command(f"python scripts/youtube-downloader-ffmpeg-subclip.py --url {config['match_url']} --start_time {config['start_time']} --end_time {config['end_time']} --output_file {output_file} --extract_frames",
-                "YouTube video download and frame extraction")
+    if should_run_step("download_and_extract", steps_to_run):
+        run_command(f"python scripts/youtube-downloader-ffmpeg-subclip.py --url {config['match_url']} --start_time {config['start_time']} --end_time {config['end_time']} --output_file {output_file} --extract_frames",
+                    "YouTube video download and frame extraction")
 
     # Tennis court detection
-    run_command(f"python TennisCourtDetector/infer_in_image.py --input_path {ref_image} --model_path {config['model_path']} --output_path {court_kp_file} --use_refine_kps --use_homography",
-                "Tennis court detection")
+    if should_run_step("court_detection", steps_to_run):
+        run_command(f"python TennisCourtDetector/infer_in_image.py --input_path {ref_image} --model_path {config['model_path']} --output_path {court_kp_file} --use_refine_kps --use_homography",
+                    "Tennis court detection")
 
     # Frame filtering
-    run_command(f"python scripts/tennis-court-filter-script.py --input_dir {frames_dir} --ref_img {ref_image} --court_kp_file {court_kp_file} --output_dir {filtered_frames_dir} --num_cores {config['num_cores']} --part_size {config['part_size']}",
-                "Frame filtering")
+    if should_run_step("frame_filtering", steps_to_run):
+        run_command(f"python scripts/tennis-court-filter-script.py --input_dir {frames_dir} --ref_img {ref_image} --court_kp_file {court_kp_file} --output_dir {filtered_frames_dir} --num_cores {config['num_cores']} --part_size {config['part_size']}",
+                    "Frame filtering")
 
     # Run inference
-    run_command(f"python training/run_inference.py --infer_data_path {frames_dir} --train_data_path {config['train_data_path']} --mode test --samples_per_batch {config['samples_per_batch']} --load_learner {config['load_learner']}",
-                "Running inference")
+    if should_run_step("run_inference", steps_to_run):
+        run_command(f"python training/run_inference.py --infer_data_path {frames_dir} --train_data_path {config['train_data_path']} --mode test --samples_per_batch {config['samples_per_batch']} --load_learner {config['load_learner']}",
+                    "Running inference")
 
     # ViTPose model
-    run_command(f"python ViTPose/model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {clip_csv} --output_dir {vitpose_output_dir} --show_viz --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}",
-                "ViTPose model processing")
+    if should_run_step("vitpose_processing", steps_to_run):
+        run_command(f"python ViTPose/model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {clip_csv} --output_dir {vitpose_output_dir} --show_viz --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}",
+                    "ViTPose model processing")
 
     # Data preparation
-    run_command(f"python scripts/data-preparation-script.py --bbox_file1 {bbox_file1} --bbox_file2 {bbox_file2} --ball_file {ball_file} --court_file {court_file} --output_file {data_prep_output}",
-                "Data preparation")
+    if should_run_step("data_preparation", steps_to_run):
+        run_command(f"python scripts/data-preparation-script.py --bbox_file1 {bbox_file1} --bbox_file2 {bbox_file2} --ball_file {ball_file} --court_file {court_file} --output_file {data_prep_output}",
+                    "Data preparation")
 
     # Fix outliers
-    run_command(f"python scripts/fix_outliers.py --override_file {override_file} --input_file {data_prep_output} --output_file {fixed_output} --debug",
-                "Fixing outliers")
+    if should_run_step("fix_outliers", steps_to_run):
+        run_command(f"python scripts/fix_outliers.py --override_file {override_file} --input_file {data_prep_output} --output_file {fixed_output} --debug",
+                    "Fixing outliers")
 
     # Identify serve and end of points
-    run_command(f"python scripts/identify_serve_endofpoint.py --input_file {fixed_output} --output_dict_file {serve_end_pts_file} --output_df_file {serve_endofpoint_df_file} --local_img_folder {frames_dir} --debug",
-                "Identifying serve and end of points")
+    if should_run_step("identify_serve_end", steps_to_run):
+        run_command(f"python scripts/identify_serve_endofpoint.py --input_file {fixed_output} --output_dict_file {serve_end_pts_file} --output_df_file {serve_endofpoint_df_file} --local_img_folder {frames_dir} --debug",
+                    "Identifying serve and end of points")
 
     # Identify hits and bounces
-    run_command(f"python scripts/identify_hits_and_bounce.py --input_file {serve_endofpoint_df_file} --serve_endofpoint_dict_file {serve_end_pts_file} --hit_override_file {hit_override_file} --output_file {hit_pts_file}",
-                "Identifying hits and bounces")
+    if should_run_step("identify_hits_bounces", steps_to_run):
+        run_command(f"python scripts/identify_hits_and_bounce.py --input_file {serve_endofpoint_df_file} --serve_endofpoint_dict_file {serve_end_pts_file} --hit_override_file {hit_override_file} --output_file {hit_pts_file}",
+                    "Identifying hits and bounces")
 
     # Identify final points
-    run_command(f"python scripts/identify_final_points.py --input_df_file {hit_pts_file} --input_dict_file {hit_pts_file} --points_override_file {points_override_file} --points_drop_file {points_drop_file} --local_img_folder {frames_dir} --court_kp_file {court_kp_file} --output_df_file {final_df_file}",
-                "Identifying final points")
+    if should_run_step("identify_final_points", steps_to_run):
+        run_command(f"python scripts/identify_final_points.py --input_df_file {hit_pts_file} --input_dict_file {hit_pts_file} --points_override_file {points_override_file} --points_drop_file {points_drop_file} --local_img_folder {frames_dir} --court_kp_file {court_kp_file} --output_df_file {final_df_file}",
+                    "Identifying final points")
 
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Tennis match analysis for {video_name} completed successfully!")
 
