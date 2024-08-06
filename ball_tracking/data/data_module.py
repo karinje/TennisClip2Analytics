@@ -77,7 +77,13 @@ class BaseDataModule(object):
 
     def get_valid_files(self):
         def _get_valid_files(path: Path):
-            files = get_image_files(path)
+            if path.is_file():
+                with open(str(path), 'r') as file:
+                    files = [Path(line.rstrip('\n')) for line in file.readlines()]
+                    files = L(files)
+                    #print(f'printfing files: {files}')
+            else:
+                files = get_image_files(path)
             offsets = all_offsets(self.num_inp_images, self.target_pos)
             prefix = find_prefix(files[0].stem)
             logging.debug(set([offset_fname(files[0], offset, prefix=prefix) for offset in offsets]), self.num_inp_images)

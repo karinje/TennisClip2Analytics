@@ -26,6 +26,7 @@ step: 1
 
 # Additional parameters
 ref_image: "img_0900.jpg"
+ref_image_dir: "/home/ubuntu/test-storage/Users/sanjaykarinje/Downloads/match_frames_v2/"
 
 # Shared directory for input files that don't change between runs
 shared_input_dir: "/Users/sanjaykarinje/Downloads/shared_inputs"

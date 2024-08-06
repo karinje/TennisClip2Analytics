@@ -128,9 +128,9 @@ def main():
     all_clips_df = pd.DataFrame(all_clips)
     all_clips_grp = all_clips_df.reset_index().groupby('clip_num').apply(lambda x: pd.Series([x['kp'].count()]))
     all_clips_grp.columns = ['f_count']
-    all_clips_df[all_clips_df.clip_num.isin(all_clips_grp[all_clips_grp.f_count>100].index.values)].to_csv(f'{path.stem}_processed.csv')
+    all_clips_df[all_clips_df.clip_num.isin(all_clips_grp[all_clips_grp.f_count>100].index.values)].to_csv(os.path.join(args.output_dir, f'clips_filtered.csv'))
     all_valid_arr = all_clips_df[all_clips_df.clip_num.isin(all_clips_grp[all_clips_grp.f_count>100].index.values)].index.values
-    np.savetxt(os.path.join(args.output_dir, f'{path.stem}_valid_imgs.txt'), all_valid_arr, fmt='%s')
+    np.savetxt(os.path.join(args.output_dir, f'imglist_filtered.csv'), all_valid_arr, fmt='%s')
 
 if __name__ == "__main__":
     main()

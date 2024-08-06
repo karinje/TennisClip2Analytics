@@ -3,17 +3,44 @@ import subprocess
 import os
 import yaml
 import time
+from pathlib import Path
+import subprocess
+import sys
+from contextlib import contextmanager
+
+@contextmanager
+def change_dir(new_dir):
+    old_dir = os.getcwd()
+    os.chdir(new_dir)
+    try:
+        yield
+    finally:
+        os.chdir(old_dir)
+
 
 def run_command(command, step_name):
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting {step_name}...")
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = process.communicate()
-    if process.returncode != 0:
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+    output = []
+    while True:
+            try:
+                # Use readline() to get output line by line
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    print(line.rstrip(), flush=True)  # Print without extra newline and flush immediately
+                    output.append(line.rstrip())
+            except Exception as e:
+                print(f"Error reading output: {e}")
+                break
+    return_code = process.poll()
+    if return_code != 0:
         print(f"Error executing command: {command}")
-        print(stderr.decode())
-        exit(1)
+        print("\n".join(output))
+        sys.exit(1)
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Completed {step_name}")
-    return stdout.decode()
+    return "\n".join(output)
 
 def should_run_step(step_name, steps_to_run):
     return "all" in steps_to_run or step_name in steps_to_run
@@ -37,9 +64,14 @@ def main(config_file):
 
     # Derive file names based on video_name
     output_file = os.path.join(video_dir, f"{video_name}.mp4")
-    frames_dir = os.path.join(video_dir, "frames")
-    filtered_frames_dir = os.path.join(video_dir, "filtered_frames")
-    ref_image = os.path.join(frames_dir, config['ref_image'])
+    frames_dir = str( Path(output_file).parent / (Path(output_file).stem + "_frames"))
+    filtered_frames_dir = os.path.join(video_dir, "filtered_frames_files")
+    ref_dir = frames_dir if config['ref_image_dir'] is None else config['ref_image_dir']
+    ref_image = os.path.join(ref_dir, config['ref_image'])
+    print(f'ref_image_path: {ref_image}')
+    filtered_img_list = os.path.join(filtered_frames_dir, 'imglist_filtered.csv')
+    filtered_clip_csv = os.path.join(filtered_frames_dir, 'clips_filtered.csv')
+    print(f'filtered_img_list: {filtered_img_list}')
     court_kp_file = os.path.join(video_dir, f"{video_name}_court_kp.txt")
     data_prep_output = os.path.join(video_dir, f"{video_name}_data_prep_results.csv")
     fixed_output = os.path.join(video_dir, f"{video_name}_fixed.csv")
@@ -54,7 +86,6 @@ def main(config_file):
     bbox_file2 = os.path.join(shared_input_dir, f"{video_name}_bbox2.json")
     ball_file = os.path.join(shared_input_dir, f"{video_name}_ball.csv")
     court_file = os.path.join(shared_input_dir, f"{video_name}_court.csv")
-    clip_csv = os.path.join(shared_input_dir, f"{video_name}_clip.csv")
     override_file = os.path.join(shared_input_dir, f"{video_name}_override.csv")
     hit_override_file = os.path.join(shared_input_dir, f"{video_name}_hit_override.csv")
     points_override_file = os.path.join(shared_input_dir, f"{video_name}_points_override.csv")
@@ -77,14 +108,23 @@ def main(config_file):
 
     # Run inference
     if should_run_step("run_inference", steps_to_run):
-        run_command(f"python training/run_inference.py --infer_data_path {frames_dir} --train_data_path {config['train_data_path']} --mode test --samples_per_batch {config['samples_per_batch']} --load_learner {config['load_learner']}",
+        run_command(f"python training/run_inference.py --infer_data_path {filtered_img_list} --train_data_path {config['train_data_path']} --mode test --samples_per_batch {config['samples_per_batch']} --load_learner {config['load_learner']} --num_inp_images {config['num_inp_images']} --target_img_position {config['target_img_position']} --final_act {config['final_act']} --results_file {ball_file}",
                     "Running inference")
 
     # ViTPose model
-    if should_run_step("vitpose_processing", steps_to_run):
-        run_command(f"python ViTPose/model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {clip_csv} --output_dir {vitpose_output_dir} --show_viz --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}",
-                    "ViTPose model processing")
 
+    if should_run_step("vitpose_processing", steps_to_run):
+        ViT_dir = '/home/ubuntu/test-storage/ViTPose/'
+        old_dir = os.getcwd()
+        os.chdir(ViT_dir)
+        print(f'changed dir to {os.getcwd()}')
+        subprocess.Popen('conda activate openmmlabv2', shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        current_env = os.environ.get('CONDA_DEFAULT_ENV') or 'base'
+        print(f"change conda environment: {current_env}")
+        run_command(f"python model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {filtered_clip_csv} --output_dir {vitpose_output_dir}  --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}",
+                    "ViTPose model processing")
+        os.chdir(old_dir)
+        subprocess.Popen('conda deactivate', shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
     # Data preparation
     if should_run_step("data_preparation", steps_to_run):
         run_command(f"python scripts/data-preparation-script.py --bbox_file1 {bbox_file1} --bbox_file2 {bbox_file2} --ball_file {ball_file} --court_file {court_file} --output_file {data_prep_output}",

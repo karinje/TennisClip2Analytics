@@ -1,4 +1,5 @@
 import argparse
+import time
 from pathlib import Path
 from fastbook import *
 import numpy as np
@@ -12,6 +13,7 @@ from torch.profiler import profile, record_function, ProfilerActivity
 import logging
 from ball_tracking.metrics.utils import mask2coord
 # In order to ensure reproducible experiments, we must set random seeds.
+from tqdm import tqdm
 np.random.seed(42)
 torch.manual_seed(42)
 
@@ -58,6 +60,7 @@ def _setup_parser():
     model_group = parser.add_argument_group("Model Args")
     model_class.add_to_argparser(model_group)
 
+    parser.add_argument('--results_file', type=str, required=True, help='path to results file')
     parser.add_argument("--help", "-h", action="help")
     return parser
 
@@ -79,13 +82,21 @@ def main():
     logging.info(f'device: {def_device}')
     if args.load_learner is not None:
         learn = learn.load(args.load_learner)
-    test_files = data.get_valid_files()(args.infer_data_path)
+    if os.path.isfile(args.infer_data_path):
+        with open(args.infer_data_path, 'r') as file: lines = file.readlines()
+        test_files = L([Path(line.strip()) for line in lines if line.strip()])
+    elif os.path.isdir(args.infer_data_path):
+        test_files = data.get_valid_files()(Path(args.infer_data_path))
     test_files.sort()
     test_dl = learn.dls.test_dl(test_files)
     all_preds, all_ys = torch.tensor([]).to(def_device), torch.tensor([]).to(def_device)
     infer_dl = learn.dls.valid if args.mode=="valid" else test_dl
-    for idx,batch in enumerate(infer_dl):
-       if idx%100==0: print(f'idx: {idx}')
+    start_time = time.time()
+    print_every = 100
+    for idx,batch in enumerate(tqdm(infer_dl, desc='Processing batches', unit='batch')):
+       if (idx+1)%print_every==0: 
+           curr_time = time.time()
+           print(f'{idx}: avg time taken for {print_every} samples: {(curr_time-start_time)/((idx+1)//print_every)}')
        pred, y = mask2coord(learn.model.to(def_device)(*batch[:args.num_inp_images])), mask2coord(batch[args.num_inp_images]) if len(batch)==4 else torch.tensor([[0,0]])
        all_preds = torch.cat((all_preds, pred.to(def_device)), axis=0)
        #logging.info(f'idx: {idx}, {pred}')
@@ -96,7 +107,7 @@ def main():
     results_df.columns = ['pred_x', 'pred_y', 'gt_x', 'gt_y']
     results_df['r2'] = np.sqrt((results_df['pred_x']-results_df['gt_x'])**2+(results_df['pred_y']-results_df['gt_y'])**2).round()
     results_df.index = pd.array(infer_dl.items)
-    results_df.to_csv(f'{args.mode}_{test_name}_set_results.csv')
+    results_df.to_csv(f'{args.results_file}')
 
 
 if __name__ == "__main__":

@@ -93,6 +93,7 @@ def main():
     """
     Main function to parse command-line arguments and execute the video download and frame extraction.
     """
+    print(f'entered checking')
     parser = argparse.ArgumentParser(description='Download YouTube video segment and extract frames.')
     parser.add_argument('--url', required=True, help='YouTube video URL')
     parser.add_argument('--start_time', required=True, help='Start time of the segment (HH:MM:SS)')
