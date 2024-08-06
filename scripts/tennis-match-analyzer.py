@@ -8,6 +8,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 
+
 @contextmanager
 def change_dir(new_dir):
     old_dir = os.getcwd()
@@ -17,30 +18,72 @@ def change_dir(new_dir):
     finally:
         os.chdir(old_dir)
 
-
-def run_command(command, step_name):
+def run_command(command, step_name, conda_envs=None, working_dir=None, env_vars=None, check_packages=None):
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting {step_name}...")
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-    output = []
-    while True:
-            try:
-                # Use readline() to get output line by line
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
-                    break
-                if line:
-                    print(line.rstrip(), flush=True)  # Print without extra newline and flush immediately
-                    output.append(line.rstrip())
-            except Exception as e:
-                print(f"Error reading output: {e}")
-                break
-    return_code = process.poll()
+    conda_path = os.path.expanduser('~/test-storage/miniconda3')  # Adjust this path if necessary
+    conda_sh_path = os.path.join(conda_path, 'etc', 'profile.d', 'conda.sh')
+    env = os.environ.copy()
+    if env_vars:
+        env.update(env_vars)
+    package_check_code = """
+
+import importlib
+import sys
+
+def check_package(package_name):
+    try:
+        package = importlib.import_module(package_name)
+        print(f'Package {{package_name}} is installed at: {{package.__file__}}')
+    except ImportError:
+        print(f'Package {{package_name}} is not installed or cannot be imported.')
+
+for package in {0}:
+    check_package(package)
+
+print(f'Python path: {{sys.path}}')
+"""
+    # Start building the command
+    full_command = f"""
+source {conda_sh_path}
+conda init zsh
+source ~/.zshrc
+"""
+    if conda_envs:
+        for env_name in conda_envs:
+            full_command += f"conda activate {env_name} && "
+    if working_dir:
+        full_command += f"export PYTHONPATH={working_dir}:$PYTHONPATH && "
+    full_command += "echo \"Current Conda environment: $CONDA_DEFAULT_ENV\" && which python && python --version"
+    if check_packages:
+        package_list = str(check_packages)
+        full_command += f' && python -c "{package_check_code.format(package_list)}"'
+    full_command += f" && {command}"
+    if conda_envs:
+        full_command += " && conda deactivate" * len(conda_envs)
+
+    # Use a context manager to change directory if working_dir is specified
+    with change_dir(working_dir) if working_dir else contextmanager(lambda: (yield))():
+        # Run the command
+        process = subprocess.Popen(full_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
+                                   text=True, executable='/bin/bash', env=env)
+        
+        output = []
+        for line in iter(process.stdout.readline, ''):
+            print(line.rstrip(), flush=True)
+            output.append(line.rstrip())
+        
+        process.stdout.close()
+        return_code = process.wait()
+    
     if return_code != 0:
-        print(f"Error executing command: {command}")
+        print(f"Error executing command: {full_command}")
         print("\n".join(output))
         sys.exit(1)
+    
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Completed {step_name}")
     return "\n".join(output)
+
+
 
 def should_run_step(step_name, steps_to_run):
     return "all" in steps_to_run or step_name in steps_to_run
@@ -114,17 +157,13 @@ def main(config_file):
     # ViTPose model
 
     if should_run_step("vitpose_processing", steps_to_run):
-        ViT_dir = '/home/ubuntu/test-storage/ViTPose/'
-        old_dir = os.getcwd()
-        os.chdir(ViT_dir)
-        print(f'changed dir to {os.getcwd()}')
-        subprocess.Popen('conda activate openmmlabv2', shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-        current_env = os.environ.get('CONDA_DEFAULT_ENV') or 'base'
-        print(f"change conda environment: {current_env}")
-        run_command(f"python model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {filtered_clip_csv} --output_dir {vitpose_output_dir}  --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}",
-                    "ViTPose model processing")
-        os.chdir(old_dir)
-        subprocess.Popen('conda deactivate', shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+        run_command(f"python model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {filtered_clip_csv} --output_dir {vitpose_output_dir}  --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}"
+        ,"ViTPose model processing"
+        , conda_envs=["openmmlabv2"]
+        , working_dir="/home/ubuntu/test-storage/ViTPose"
+        , env_vars={"PYTHONPATH": "/home/ubuntu/test-storage/ViTPose:$PYTHONPATH"}
+        , check_packages=["mmdet"]
+)
     # Data preparation
     if should_run_step("data_preparation", steps_to_run):
         run_command(f"python scripts/data-preparation-script.py --bbox_file1 {bbox_file1} --bbox_file2 {bbox_file2} --ball_file {ball_file} --court_file {court_file} --output_file {data_prep_output}",
