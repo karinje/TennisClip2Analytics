@@ -16,6 +16,7 @@ from itertools import zip_longest
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.preprocessing import PolynomialFeatures
 from scipy.optimize import fsolve
+import os
 
 HYPERS = {'d1':3, 'd2':2, 'a1':0.1, 'a2':0.1}
 
@@ -94,7 +95,7 @@ def pick_best_hit(df,turn_only=False):
     if len(np.unique(df.side))>1:
        logging.debug('inside pick best')
        logging.debug(df[['side']])
-       raise ValueError(f"Multiple sides found in turn_df")
+       raise ValueError(f"Multiple sides found in turn_df: {df.shape} {df.side.value_counts()} {np.unique(df.side)}")
     df['abs_theta1_delta'] = df['theta1_delta'].abs()
     df['theta_dist'] = abs(df['abs_theta1_delta']) + abs(df['y_f25']) 
     sort_cols = ['theta_dist']
@@ -161,7 +162,7 @@ def find_pt_hits(serve_hit_pts, end_pts_mod, results_df, clip_df):
                 logging.debug('entering elif')
                 pop_row = turn_df.iloc[0]
                 turn_df = turn_df.iloc[1:] 
-                temp_df = temp_df.append(pop_row, ignore_index=False)
+                temp_df = pd.concat([temp_df, pop_row], ignore_index=False)
                 logging.debug(f'Inserting to temp: {find_s} {top_row.name} {pop_row.name} {pop_row.side} turn_df shape: {turn_df.shape}')
             else:
                 if len(temp_df)==0: 
@@ -377,13 +378,14 @@ def main(input_file, serve_endofpoint_dict_file, turn_override_file, hit_overrid
         warnings.simplefilter("ignore")
         df = pd.read_pickle(input_file)
         df = add_turn_attribs(df)
-        apply_df_overrides(turn_override_file, df)
+        if os.path.exists(turn_override_file): apply_df_overrides(turn_override_file, df)
         with open(serve_endofpoint_dict_file, 'rb') as fp:
             serve_dict, end_dict = pickle.load(fp)
         hit_pts = apply_func_all_clips(df, partial(find_pt_hits, serve_dict, end_dict, df))
         corrections_dict = {}
-        apply_dict_overrides(hit_override_file, corrections_dict)
-        apply_corrections(hit_pts, corrections_dict)
+        if os.path.exists(hit_override_file):
+            apply_dict_overrides(hit_override_file, corrections_dict)
+            apply_corrections(hit_pts, corrections_dict)
         hit_bounce_pts = apply_func_all_clips(df, partial(add_bounce_to_point_hits, hit_pts))
         df.to_pickle(output_df_file)
         with open(output_file, 'wb') as file:

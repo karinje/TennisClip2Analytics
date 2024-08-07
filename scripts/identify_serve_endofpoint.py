@@ -1,4 +1,4 @@
-from utils import apply_df_overrides, apply_dict_overrides, read_df_from_csv, save_df_to_csv, filter_clip, reset_logging, configure_logging, apply_func_all_clips, r2_dist, not_nan, fname2int, offset_fname
+from utils import apply_df_overrides, apply_dict_overrides, read_df_from_csv, save_df_to_csv, filter_clip, reset_logging, configure_logging, apply_func_all_clips, r2_dist, not_nan, check_nan, fname2int, offset_fname
 import logging
 import argparse
 import pandas as pd
@@ -46,8 +46,8 @@ def extract_player_bbox_kps(df, local_img_folder):
     get_box, get_kp = itemgetter('bbox'), itemgetter('keypoints')
     for idx, (f, row) in tqdm(enumerate(df.iterrows()), total=len(df), desc="Adding player attribs"):
         img_path = str(Path(local_img_folder)/f)
-        player_boxes = np.array([get_box(item) for item in row.bbox_data])
-        player_kps = np.array([get_kp(item) for item in row.bbox_data])
+        player_boxes = np.array([get_box(item) for item in row.bbox_data]) if not isinstance(row.bbox_data, float) else np.array([])
+        player_kps = np.array([get_kp(item) for item in row.bbox_data]) if not isinstance(row.bbox_data, float) else np.array([])
         if player_boxes.shape[0]==0 or max([box_area(box) for box in player_boxes]) > 20000: continue 
         court_center = row.kp.squeeze()[12:14].mean(axis=0)
         player_f = np.array([True if item[3]<court_center[1] else False for item in player_boxes])
@@ -239,7 +239,7 @@ def clip_end_fs(serve_pts, clip_df):
     return list(set(end_fs)-set(end_del_fs))
 
 def main(input_file, local_img_folder, serve_override_file, end_override_file, output_df_file, output_dict_file, debug):
-    df = read_df_from_csv(input_file, ndarr_cols=NDARR_COLS)
+    df = pd.read_pickle(input_file)
     results_df = extract_player_bbox_kps(df, local_img_folder)
     results_df = add_player_attribs(results_df)
     results_df = add_serve_attribs(results_df)

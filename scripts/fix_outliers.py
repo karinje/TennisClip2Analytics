@@ -3,7 +3,9 @@ import logging
 import argparse
 import pandas as pd
 import numpy as np
-import warnings 
+import warnings
+import pickle
+import os
 NDARR_COLS =  ['kp','hm','bbox_data']
 
 def fix_outliers(df):
@@ -54,13 +56,13 @@ def fix_outliers(df):
 
 def main(input_file, override_file, output_file, debug):
     
-    df = read_df_from_csv(input_file, ndarr_cols=NDARR_COLS)
-    apply_df_overrides(override_file, df)
+    df = pd.read_pickle(input_file)
+    if os.path.exists(override_file): apply_df_overrides(override_file, df)
     clean_df = pd.DataFrame([])
     for clip_num in sorted(df.clip_num.value_counts().index.values):
             clip_df = fix_outliers(fix_outliers(filter_clip(df, clip_num)))
             clean_df = pd.concat([clean_df,clip_df], axis=0)
-    save_df_to_csv(clean_df, output_file)
+    clean_df.to_pickle(output_file)
     reset_logging()
     configure_logging(debug)
     logging.debug(f'{df.shape}, {clean_df.shape}')

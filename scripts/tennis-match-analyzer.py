@@ -101,7 +101,7 @@ def main(config_file):
 
     print(f"Processing video: {video_name}")
 
-    # Create a directory for this specific video
+    # Create a directory for this specific video/show_viz
     video_dir = os.path.join(base_dir, video_name)
     os.makedirs(video_dir, exist_ok=True)
 
@@ -116,7 +116,7 @@ def main(config_file):
     filtered_clip_csv = os.path.join(filtered_frames_dir, 'clips_filtered.csv')
     print(f'filtered_img_list: {filtered_img_list}')
     court_kp_file = os.path.join(video_dir, f"{video_name}_court_kp.txt")
-    data_prep_output = os.path.join(video_dir, f"{video_name}_data_prep_results.csv")
+    data_prep_output = os.path.join(video_dir, f"{video_name}_data_prep_results.pkl")
     fixed_output = os.path.join(video_dir, f"{video_name}_fixed.csv")
     serve_end_pts_file = os.path.join(video_dir, f"{video_name}_serve_end_pts.pkl")
     serve_endofpoint_df_file = os.path.join(video_dir, f"{video_name}_serve_endofpoint_df_out.csv")
@@ -128,9 +128,10 @@ def main(config_file):
     bbox_file1 = os.path.join(shared_input_dir, f"{video_name}_bbox1.json")
     bbox_file2 = os.path.join(shared_input_dir, f"{video_name}_bbox2.json")
     ball_file = os.path.join(shared_input_dir, f"{video_name}_ball.csv")
-    court_file = os.path.join(shared_input_dir, f"{video_name}_court.csv")
+    court_file = os.path.join(filtered_frames_dir, f"clips_filtered.csv")
     override_file = os.path.join(shared_input_dir, f"{video_name}_override.csv")
     hit_override_file = os.path.join(shared_input_dir, f"{video_name}_hit_override.csv")
+    turn_override_file = os.path.join(shared_input_dir, f"{video_name}_turn_override.csv")
     points_override_file = os.path.join(shared_input_dir, f"{video_name}_points_override.csv")
     points_drop_file = os.path.join(shared_input_dir, f"{video_name}_points_drop.csv")
 
@@ -157,7 +158,7 @@ def main(config_file):
     # ViTPose model
 
     if should_run_step("vitpose_processing", steps_to_run):
-        run_command(f"python model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {filtered_clip_csv} --output_dir {vitpose_output_dir}  --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}"
+        run_command(f"python model_v3.py --det_model_name '{config['det_model_name']}' --pose_model_name '{config['pose_model_name']}' --clip_csv {filtered_clip_csv} --output_dir {vitpose_output_dir}  --output_json {bbox_file1} --start_row {config['start_row']} --end_row {config['end_row']} --step {config['step']}"
         ,"ViTPose model processing"
         , conda_envs=["openmmlabv2"]
         , working_dir="/home/ubuntu/test-storage/ViTPose"
@@ -166,7 +167,7 @@ def main(config_file):
 )
     # Data preparation
     if should_run_step("data_preparation", steps_to_run):
-        run_command(f"python scripts/data-preparation-script.py --bbox_file1 {bbox_file1} --bbox_file2 {bbox_file2} --ball_file {ball_file} --court_file {court_file} --output_file {data_prep_output}",
+        run_command(f"python scripts/data-preparation-script.py --bbox_file1 {bbox_file1}  --ball_file {ball_file} --court_file {court_file} --output_file {data_prep_output} --local_img_folder {frames_dir}",
                     "Data preparation")
 
     # Fix outliers
@@ -181,7 +182,7 @@ def main(config_file):
 
     # Identify hits and bounces
     if should_run_step("identify_hits_bounces", steps_to_run):
-        run_command(f"python scripts/identify_hits_and_bounce.py --input_file {serve_endofpoint_df_file} --serve_endofpoint_dict_file {serve_end_pts_file} --hit_override_file {hit_override_file} --output_file {hit_pts_file}",
+        run_command(f"python scripts/identify_hits_and_bounce.py --input_file {serve_endofpoint_df_file} --serve_endofpoint_dict_file {serve_end_pts_file} --turn_override_file {turn_override_file} --hit_override_file {hit_override_file} --output_dict_file {serve_end_pts_file} --output_df_file {serve_endofpoint_df_file} --debug",
                     "Identifying hits and bounces")
 
     # Identify final points
