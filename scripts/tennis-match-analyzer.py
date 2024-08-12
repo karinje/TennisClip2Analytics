@@ -116,11 +116,13 @@ def main(config_file):
     filtered_clip_csv = os.path.join(filtered_frames_dir, 'clips_filtered.csv')
     print(f'filtered_img_list: {filtered_img_list}')
     court_kp_file = os.path.join(video_dir, f"{video_name}_court_kp.txt")
+    court_kp_file_w_net = '/home/ubuntu/test-storage/ball_tracking_3d/court_kp_v2.csv'
     data_prep_output = os.path.join(video_dir, f"{video_name}_data_prep_results.pkl")
     fixed_output = os.path.join(video_dir, f"{video_name}_fixed.csv")
     serve_end_pts_file = os.path.join(video_dir, f"{video_name}_serve_end_pts.pkl")
     serve_endofpoint_df_file = os.path.join(video_dir, f"{video_name}_serve_endofpoint_df_out.csv")
-    hit_pts_file = os.path.join(video_dir, f"{video_name}_hit_pts.pkl")
+    hit_pts_df_file = os.path.join(video_dir, f"{video_name}_hit_pts_df.pkl")
+    hit_pts_dict_file = os.path.join(video_dir, f"{video_name}_hit_pts_dict.pkl") 
     final_df_file = os.path.join(video_dir, f"{video_name}_final_df.csv")
     vitpose_output_dir = os.path.join(video_dir, "vitpose_output")
 
@@ -131,6 +133,8 @@ def main(config_file):
     court_file = os.path.join(filtered_frames_dir, f"clips_filtered.csv")
     override_file = os.path.join(shared_input_dir, f"{video_name}_override.csv")
     hit_override_file = os.path.join(shared_input_dir, f"{video_name}_hit_override.csv")
+    serve_override_file = os.path.join(shared_input_dir, f"{video_name}_serve_override.csv")
+    end_override_file = os.path.join(shared_input_dir, f"{video_name}_end_override.csv")
     turn_override_file = os.path.join(shared_input_dir, f"{video_name}_turn_override.csv")
     points_override_file = os.path.join(shared_input_dir, f"{video_name}_points_override.csv")
     points_drop_file = os.path.join(shared_input_dir, f"{video_name}_points_drop.csv")
@@ -152,7 +156,7 @@ def main(config_file):
 
     # Run inference
     if should_run_step("run_inference", steps_to_run):
-        run_command(f"python training/run_inference.py --infer_data_path {filtered_img_list} --train_data_path {config['train_data_path']} --mode test --samples_per_batch {config['samples_per_batch']} --load_learner {config['load_learner']} --num_inp_images {config['num_inp_images']} --target_img_position {config['target_img_position']} --final_act {config['final_act']} --results_file {ball_file}",
+        run_command(f"python training/run_inference.py --model_class {config['model_class']} --infer_data_path {filtered_img_list} --train_data_path {config['train_data_path']} --mode test --samples_per_batch {config['samples_per_batch']} --load_learner {config['load_learner']} --num_inp_images {config['num_inp_images']} --target_img_position {config['target_img_position']} --final_act {config['final_act']} --results_file {ball_file}",
                     "Running inference")
 
     # ViTPose model
@@ -177,17 +181,17 @@ def main(config_file):
 
     # Identify serve and end of points
     if should_run_step("identify_serve_end", steps_to_run):
-        run_command(f"python scripts/identify_serve_endofpoint.py --input_file {fixed_output} --output_dict_file {serve_end_pts_file} --output_df_file {serve_endofpoint_df_file} --local_img_folder {frames_dir} --debug",
+        run_command(f"python scripts/identify_serve_endofpoint.py --input_file {fixed_output} --output_dict_file {serve_end_pts_file} --output_df_file {serve_endofpoint_df_file} --local_img_folder {frames_dir} --serve_override_file {serve_override_file} --end_override_file {end_override_file} --debug",
                     "Identifying serve and end of points")
 
     # Identify hits and bounces
     if should_run_step("identify_hits_bounces", steps_to_run):
-        run_command(f"python scripts/identify_hits_and_bounce.py --input_file {serve_endofpoint_df_file} --serve_endofpoint_dict_file {serve_end_pts_file} --turn_override_file {turn_override_file} --hit_override_file {hit_override_file} --output_dict_file {serve_end_pts_file} --output_df_file {serve_endofpoint_df_file} --debug",
+        run_command(f"python scripts/identify_hits_and_bounce.py --input_file {serve_endofpoint_df_file} --serve_endofpoint_dict_file {serve_end_pts_file} --turn_override_file {turn_override_file} --hit_override_file {hit_override_file} --output_dict_file {hit_pts_dict_file} --output_df_file {hit_pts_df_file} ",
                     "Identifying hits and bounces")
 
     # Identify final points
     if should_run_step("identify_final_points", steps_to_run):
-        run_command(f"python scripts/identify_final_points.py --input_df_file {hit_pts_file} --input_dict_file {hit_pts_file} --points_override_file {points_override_file} --points_drop_file {points_drop_file} --local_img_folder {frames_dir} --court_kp_file {court_kp_file} --output_df_file {final_df_file}",
+        run_command(f"python scripts/identify_final_points.py --input_df_file {hit_pts_df_file} --input_dict_file {hit_pts_dict_file} --points_override_file {points_override_file} --points_drop_file {points_drop_file} --local_img_folder {frames_dir} --court_kp_file {court_kp_file_w_net} --output_df_file {final_df_file}",
                     "Identifying final points")
 
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Tennis match analysis for {video_name} completed successfully!")

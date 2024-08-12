@@ -11,6 +11,7 @@ from functools import partial
 from pathlib import Path
 import pickle
 from collections import defaultdict
+import os
 
 NDARR_COLS =  ['kp','hm','bbox_data']
 P1_PLAYER = np.array([[160, 100, 100],[180, 255, 255]]) #red mask
@@ -248,8 +249,8 @@ def main(input_file, local_img_folder, serve_override_file, end_override_file, o
     results_df = add_point_end_attribs(results_df) 
     results_df.to_pickle(output_df_file)
     end_pts = apply_func_all_clips(results_df, partial(clip_end_fs, serve_pre_pts), clip_end_offset=50) 
-    apply_dict_overrides(serve_override_file, serve_pts)
-    apply_dict_overrides(end_override_file, end_pts)
+    if os.path.exists(serve_override_file): apply_dict_overrides(serve_override_file, serve_pts)
+    if os.path.exists(end_override_file): apply_dict_overrides(end_override_file, end_pts)
     with open(output_dict_file, 'wb') as file:
         pickle.dump([dict(serve_pts), dict(end_pts)], file)
     reset_logging()

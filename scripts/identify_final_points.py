@@ -21,7 +21,7 @@ import types
 from functools import partial
 from itertools import starmap
 import numpy.linalg as LA
-
+import os
 col_x_v1_p1, col_x_v1_p2, col_x_v2_p1, col_x_v2_p2 = 10, 13, 8, 12
 col_y_v1_p1, col_y_v1_p2, col_y_v2_p1, col_y_v2_p2 = 10, 8, 13, 12
 col_z_v1_p1, col_z_v1_p2, col_z_v2_p1, col_z_v2_p2 = 14, 15, 16, 17 #'LeftB', 'LeftTop', 'RightB', 'RightTop'
@@ -343,8 +343,8 @@ def main(input_dict_file, input_df_file, points_override_file, points_drop_file,
         with open(input_dict_file, 'rb') as fp:
             hits_and_bounce_dict = pickle.load(fp)[1]
         points_df = gen_points_df(hits_and_bounce_dict, df, local_img_folder=local_img_folder) 
-        apply_df_overrides(points_override_file, points_df)
-        drop_df_overrides(points_drop_file, points_df)
+        if os.path.exists(points_override_file): apply_df_overrides(points_override_file, points_df)
+        if os.path.exists(points_drop_file): drop_df_overrides(points_drop_file, points_df)
         all_points_df = pd.DataFrame([])
         for clip_num in np.array(sorted(points_df.clip_num.value_counts().index)):
             print(f'processing clip: {clip_num}')

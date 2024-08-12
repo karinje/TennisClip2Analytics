@@ -157,12 +157,11 @@ def find_pt_hits(serve_hit_pts, end_pts_mod, results_df, clip_df):
             logging.debug(f'turn_df shape: {turn_df.shape} find_s: {find_s} {top_row.side} {top_row.name}')
             if fname2int(top_row.name)<fname2int(s1):
                 turn_df = turn_df.iloc[1:] 
-                print(f'top row: {top_row.name} is less than {s1}')
             elif top_row.side==find_s:
                 logging.debug('entering elif')
                 pop_row = turn_df.iloc[0]
                 turn_df = turn_df.iloc[1:] 
-                temp_df = pd.concat([temp_df, pop_row], ignore_index=False)
+                temp_df = pd.concat([temp_df, pop_row.to_frame().T], ignore_index=False)
                 logging.debug(f'Inserting to temp: {find_s} {top_row.name} {pop_row.name} {pop_row.side} turn_df shape: {turn_df.shape}')
             else:
                 if len(temp_df)==0: 
@@ -182,7 +181,7 @@ def find_pt_hits(serve_hit_pts, end_pts_mod, results_df, clip_df):
             pt_hits.append([best_f, best_s, best_t])
         if best_t not in ('T','E'):
             pt_end_f = results_df.iloc[results_df.index.get_loc(pt_end_f)+41].name if pt_end_f else None
-            logging.debug(f'pt_end_f: {pt_end_f} {best_f} {best_s}')
+            #logging.debug(f'pt_end_f: {pt_end_f} {best_f} {best_s}')
             only_turn_df = clip_df.loc[(clip_df.index>s1) & (clip_df.index<=(pt_end_f if pt_end_f else (s2 if s2 else clip_df.index.values[-1]))) & (clip_df.only_turn==True)]
             logging.debug(f'only turn df: {only_turn_df.index.values}')
             temp_df = only_turn_df[(only_turn_df.index>best_f)&(only_turn_df.side==neg_side(best_s))]
@@ -367,15 +366,18 @@ def add_bounce_to_point_hits(final_pts, clip_df, hypers=HYPERS):
             if s2_ty=='T': 
                 pt_results[pt_idx].append(s1_t)
             else:
-                pt1, b_f1, pt2, b_f2 = fit_curves(clip_df, s1_f_mod, s2_f_mod, hypers, debug=False, plot=False, local_offset=6)
                 pt_results[pt_idx].append(s1_t)
-                pt_results[pt_idx].append([b_f2,'B','B'])
+                if fname2int(s2_f_mod) > fname2int(s1_f_mod):
+                    pt1, b_f1, pt2, b_f2 = fit_curves(clip_df, s1_f_mod, s2_f_mod, hypers, debug=False, plot=False, local_offset=6)
+                    pt_results[pt_idx].append([b_f2,'B','B'])
         pt_results[pt_idx].append(s2_t)
     return pt_results
 
 def main(input_file, serve_endofpoint_dict_file, turn_override_file, hit_override_file, output_dict_file, output_df_file, debug):
      with warnings.catch_warnings():
         warnings.simplefilter("ignore")
+        reset_logging()
+        configure_logging(debug)
         df = pd.read_pickle(input_file)
         df = add_turn_attribs(df)
         if os.path.exists(turn_override_file): apply_df_overrides(turn_override_file, df)
@@ -383,15 +385,16 @@ def main(input_file, serve_endofpoint_dict_file, turn_override_file, hit_overrid
             serve_dict, end_dict = pickle.load(fp)
         hit_pts = apply_func_all_clips(df, partial(find_pt_hits, serve_dict, end_dict, df))
         corrections_dict = {}
+        print(f'hit override file: {hit_override_file}')
         if os.path.exists(hit_override_file):
             apply_dict_overrides(hit_override_file, corrections_dict)
+            print(f'overrides to be applied: {corrections_dict}')
             apply_corrections(hit_pts, corrections_dict)
         hit_bounce_pts = apply_func_all_clips(df, partial(add_bounce_to_point_hits, hit_pts))
         df.to_pickle(output_df_file)
-        with open(output_file, 'wb') as file:
+        df[['x','y']].to_csv(str(Path(output_df_file).parent/(Path(output_df_file).stem +  '_verify.csv')))
+        with open(output_dict_file, 'wb') as file:
             pickle.dump([dict(hit_pts), dict(hit_bounce_pts)], file)
-        reset_logging()
-        configure_logging(debug)
         logging.debug(f'hit_pts: {hit_bounce_pts}')
 
 
